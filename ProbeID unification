@@ -1,0 +1,65 @@
+# HuGene-1_0-st (GSE138198) mapping
+library(biomaRt)
+
+hugene_probes <- read.csv("Filedirectory/list.csv", header = TRUE)[, 1] ## hugene probe list file
+
+ensembl <- useMart("ensembl")
+human <- useDataset("hsapiens_gene_ensembl", mart = ensembl)
+
+probe_map_hugene <- getBM(
+  attributes = c("affy_hugene_1_0_st_v1", "entrezgene_id"),
+  filters = "affy_hugene_1_0_st_v1",
+  values = hugene_probes,
+  mart = human
+)
+
+symbol1 <- getBM(
+  attributes = c("entrezgene_id", "hgnc_symbol"),
+  filters = "entrezgene_id",
+  values = probe_map_hugene$entrezgene_id,
+  mart = human
+)
+
+final_map1 <- merge(probe_map_hugene, symbol1, by = "entrezgene_id")
+write.csv(final_map1, file = "probeID_mapping_HuGene_to_SYMBOL(study1).csv", row.names = FALSE)
+
+data1 <- read.csv("Filedirectory/file1.csv", header = TRUE)
+mapping1 <- read.csv("Filedirectory/mapping.csv", header = TRUE)
+data1[, 1] <- mapping1$hgnc_symbol[match(data1[, 1], mapping1$affy_hugene_1_0_st_v1)]
+data1 <- data1[complete.cases(data1), ]
+write.csv(data1, "converteddata1.csv", row.names = FALSE)   ###"data1.csv"맞나 확인
+
+# HG_U95Av2 (GSE29315) mapping
+library(hgu95av2)
+probe_data2 <- as.list(hgu95av2SYMBOL)
+probe_data2 <- as.data.frame(t(probe_data2))
+write.csv(probe_data2, "list2.csv", row.names = FALSE)
+
+probe_data2 <- read.csv("Filedirectory/list2(cor).csv", header = TRUE)
+hgu95_probes <- probe_data2[, 1]
+
+ensembl <- useMart("ensembl")
+human <- useDataset("hsapiens_gene_ensembl", mart = ensembl)
+
+probe_map_hgu95 <- getBM(
+  attributes = c("affy_hg_u95av2", "entrezgene_id"),
+  filters = "affy_hg_u95av2",
+  values = hgu95_probes,
+  mart = human
+)
+
+symbol2 <- getBM(
+  attributes = c("entrezgene_id", "hgnc_symbol"),
+  filters = "entrezgene_id",
+  values = probe_map_hgu95$entrezgene_id,
+  mart = human
+)
+
+final_map2 <- merge(probe_map_hgu95, symbol2, by = "entrezgene_id")
+write.csv(final_map2, file = "probeID_mapping_HG_U95Av2_to_SYMBOL(study2).csv", row.names = FALSE)
+
+data2 <- read.csv("D:/R/hashimoto4/GSE29315-dataonly.csv", header = TRUE)
+mapping2 <- read.csv("D:/R/Hashimoto4/mapping2.csv", header = TRUE)
+data2[, 1] <- mapping2$hgnc_symbol[match(data2[, 1], mapping2$affy_hg_u95av2)]
+data2 <- data2[complete.cases(data2), ]
+write.csv(data2, "converteddata2.csv", row.names = FALSE)
