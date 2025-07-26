@@ -1,0 +1,78 @@
+# load packages
+library(clusterProfiler)
+library(enrichplot)
+library(ggplot2)
+library(org.Hs.eg.db)
+library(DOSE)
+library(pathview)
+library(writexl)
+
+# Load DEG and preprocessing 
+df <- read.csv("Filedirectory/DEGs.csv", header=TRUE)
+gene_list <- df$log2FoldChange
+names(gene_list) <- df$X
+gene_list <- na.omit(gene_list)
+gene_list <- sort(gene_list, decreasing = TRUE)
+
+# GSEA - GO (Biological Process)
+gse <- gseGO(geneList = gene_list,
+             ont = "BP",
+             keyType = "SYMBOL",
+             nPerm = 10000,
+             minGSSize = 10,
+             maxGSSize = 800,
+             pvalueCutoff = 0.05,
+             verbose = TRUE,
+             OrgDb = org.Hs.eg.db,
+             pAdjustMethod = "BH")
+
+# GO result simplify / save
+gsesimp <- simplify(gse, cutoff=0.7, by="p.adjust", select_fun=min)
+write_xlsx(as.data.frame(gsesimp), "D:/Filedirectory.xlsx")
+
+# Visualization
+barplot(gsesimp, showCategory=20)
+ridgeplot(gsesimp, showCategory=15)
+x2 <- pairwise_termsim(gsesimp)
+emapplot(x2, showCategory = 15)
+cnetplot(gsesimp, foldChange=gene_list, showCategory = 5)
+
+# GSEA plot
+gseaplot2(gsesimp, geneSetID = 1, title = gsesimp[1,]$Description)
+gseaplot2(gsesimp, geneSetID = 2, title = gsesimp[2,]$Description)
+
+# ENTREZ ID conversion for KEGG
+ids <- bitr(names(gene_list), fromType = "SYMBOL", toType = "ENTREZID", OrgDb = org.Hs.eg.db)
+dedup_ids <- ids[!duplicated(ids$SYMBOL), ]
+df2 <- df[df$X %in% dedup_ids$SYMBOL, ]
+df3 <- df2[!duplicated(df2$X), ]
+df3$ENTREZID <- dedup_ids$ENTREZID[match(df3$X, dedup_ids$SYMBOL)]
+
+# KEGG analysis gene list
+kegg_gene_list <- df3$log2FoldChange
+names(kegg_gene_list) <- df3$ENTREZID
+kegg_gene_list <- na.omit(kegg_gene_list)
+kegg_gene_list <- sort(kegg_gene_list, decreasing = TRUE)
+
+# GSEA - KEGG pathway
+kk2 <- gseKEGG(geneList = kegg_gene_list,
+               organism = "hsa",
+               nPerm = 10000,
+               minGSSize = 3,
+               maxGSSize = 800,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "none",
+               keyType = "ncbi-geneid")
+
+# KEGG result save
+write_xlsx(as.data.frame(kk2), "Filedirectory/KEGGpathwaygsea.xlsx")
+
+# KEGG Visualization
+dotplot(kk2, showCategory = 10, title = "Enriched Pathways")
+ridgeplot(kk2, showCategory = 15)
+x3 <- pairwise_termsim(kk2)
+emapplot(x3)
+cnetplot(kk2, categorySize="pvalue", foldChange=gene_list, showCategory = 5)
+
+# KEGG pathway 이미지 생성
+pathview(gene.data = kegg_gene_list, pathway.id = "hsa05322", species = "hsa")
