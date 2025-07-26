@@ -1,0 +1,81 @@
+
+if (!requireNamespace("DExMA", quietly = TRUE)) {
+  BiocManager::install("DExMA")
+}
+library(DExMA)
+library(Biobase)
+
+data1 <- read.csv("Filedirectory/file1.csv", row.names = 1)  ##file1 : GSE138198 preprocessed file
+data2 <- read.csv("Filedirectory/file2.csv", row.names = 1)  ##file2 : GSE29315 preprocessed file
+
+exprSet1 <- ExpressionSet(assayData = as.matrix(data1))
+exprSet2 <- ExpressionSet(assayData = as.matrix(data2))
+
+pheno1 <- data.frame(Group = c(rep("Thyroiditis", 8), rep("Normal", 6)))
+pheno2 <- data.frame(Group = c(rep("Thyroiditis", 6), rep("Normal", 9)))
+
+group1 <- c(rep(1, 8), rep(0, 6))  
+group2 <- c(rep(1, 6), rep(0, 9))  
+
+
+par(mfrow=c(2,2))
+boxplot(data.frame(as.matrix(data1)), main="data1",outline=FALSE)
+boxplot(data.frame(as.matrix(data2)),main="data2",outline=FALSE)
+
+
+
+library(sva)
+library(Biobase)
+
+common_genes <- intersect(rownames(exprs(exprSet1)), rownames(exprs(exprSet2)))
+exprs_data1_common <- exprs(exprSet1)[common_genes, ]
+exprs_data2_common <- exprs(exprSet2)[common_genes, ]
+combined_data <- cbind(exprs_data1_common, exprs_data2_common)
+batch_info <- c(rep(1, ncol(exprs_data1_common)), rep(2, ncol(exprs_data2_common)))
+
+normalized_data <- ComBat(dat = combined_data, batch = batch_info)
+
+normalized_exprSet1 <- ExpressionSet(assayData = normalized_data[, 1:ncol(exprs_data1_common)])
+normalized_exprSet2 <- ExpressionSet(assayData = normalized_data[, (ncol(exprs_data1_common) + 1):ncol(normalized_data)])
+
+expressionMatrix1 <- as.matrix(log2(exprs(normalized_exprSet1)))
+expressionMatrix2 <- as.matrix(log2(exprs(normalized_exprSet2)))
+
+exprSet1 <- ExpressionSet(assayData = expressionMatrix1)
+exprSet2 <- ExpressionSet(assayData = expressionMatrix2)
+
+colnames(expressionMatrix1)
+colnames(expressionMatrix2)
+
+rownames(pheno1) <- colnames(expressionMatrix1)
+rownames(pheno2) <- colnames(expressionMatrix2)
+
+
+objectMA <- createObjectMA(
+  listEX = list(exprSet1, exprSet2),
+  listPheno = list(pheno1, pheno2),
+  namePheno = list("Group", "Group"),
+  expGroups = list("Thyroiditis", "Thyroiditis"),
+  refGroups = list("Normal", "Normal")
+)
+
+newObjectMA <- dataLog(objectMA)
+
+heterogeneityTest(newObjectMA, probs = c(0, 0.25, 0.5, 0.75, 1))
+
+resultsMA <- metaAnalysisDE(newObjectMA, typeMethod="Stouffer", missAllow=0.3, proportionData=0.50)
+resultsES <- metaAnalysisDE(newObjectMA, typeMethod="Stouffer", proportionData=0.5)
+resultsPV <- metaAnalysisDE(newObjectMA, typeMethod="Stouffer", proportionData=0.5)
+
+
+makeHeatmap(
+  objectMA = newObjectMA,
+  resMA = resultsMA,
+  scaling = "zscor",
+  regulation = "all",
+  numSig = 40,
+  fdrSig = 0.05,
+  logFCSig = 0.25,
+  show_rownames = TRUE,
+  color = colorRampPalette(c("blue", "white", "red"))(100)
+)
