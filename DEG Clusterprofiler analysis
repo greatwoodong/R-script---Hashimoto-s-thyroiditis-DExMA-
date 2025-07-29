@@ -8,7 +8,7 @@ library(pathview)
 library(writexl)
 
 # Load DEG and preprocessing 
-df <- read.csv("Filedirectory/DEGs.csv", header=TRUE)
+df <- read.csv("Filedirectory/filename.csv", header=TRUE)
 gene_list <- df$log2FoldChange
 names(gene_list) <- df$X
 gene_list <- na.omit(gene_list)
